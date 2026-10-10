@@ -1,9 +1,9 @@
 # Tiny Tapeout project information
 project:
-  title:        "Talos: 32 Lane Multi-Precision Micro-NPU"      # Project title
+  title:        "Talos: 32 Lane Neuromorphic Micro-NPU"      # Project title
   author:       "Ivan"      # Your name
   discord:      "kazenowoko"      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
-  description:  "32-Lane Multi-Precision Micro-NPU for BitNet b1.58 ternary and 1-bit BNN acceleration"      # One line description of what your project does
+  description:  "32-Lane event-driven neuromorphic co-processor for ternary synaptic integration and binary neural networks"      # One line description of what your project does
   language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
   clock_hz:     16000000       # Clock frequency in Hz (or 0 if not applicable)
 
