@@ -3,7 +3,7 @@
 * SPDX-License-Identifier: Apache-2.0
 */
 
-`default_nettype 
+`default_nettype none
 
 module spi_slave (
     input wire clk,    // Clock (16MHz)
@@ -61,7 +61,7 @@ module spi_slave (
                 rx_shreg <= {rx_shreg[6:0], mosi_sync[1]};
                 bit_cnt <= bit_cnt + 3'd1;
                 if (bit_cnt == 3'd7) begin
-                    rx_byte <= {rx_shreg[6:0], mosi_sync[1]}
+                    rx_byte <= {rx_shreg[6:0], mosi_sync[1]};
                     rx_valid <= 1'b1;
                 end
             end
@@ -71,7 +71,7 @@ module spi_slave (
     // outgoing MISO shift register (SPI Mode 0)
     reg [7:0] tx_shreg;
 
-    always @(posedge c1k or negedge rst_n) begin
+    always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             tx_shreg <= 8'd0;
         end else if (tx_load) begin
