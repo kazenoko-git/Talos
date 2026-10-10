@@ -33,8 +33,7 @@ module dot_product_engine (
             // BitNet ternary mode: 00=0, 01=+1, 11=-1
             // BNN mode: bit 0 of act XNOR bit 0 of weight -> +1 or -1
 
-            wire signed [8:0] ternary_prod = {w_i == 2'b01} ? {act_i[7], act_i} :
-                {w_i == 2'b11} ? - {act_i[7], act_i} : 9'b0;
+            wire signed [8:0] ternary_prod = (w_i == 2'b01) ? {act_i[7], act_i} : (w_i == 2'b11) ? -{act_i[7], act_i} : 9'b0;
 
             wire signed [8:0] bnn_prod = (act_i[0] ~^ w_i[0]) ? 9'sd1 : -9'sd1;
 
