@@ -1,3 +1,5 @@
+![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
+
 # Talos: 32-Lane Neuromorphic Micro-NPU for GF180MCU
 
 Talos is a custom digital ASIC designed for the GlobalFoundries GF180MCU process node via the Hack Club "Basics of ASICs" YSWS through wafer.space Run 3 MPW. It functions as a hardware neuromorphic co-processor, acting as a neural engine of sorts for microcontrollers to run Edge AI models (e.g. Arduino Uno, ESP32, Raspberry Pi Pico / RP2040).
