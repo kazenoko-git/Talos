@@ -37,7 +37,7 @@ module reg_file (
     // Helper to read register data
     function [7:0] get_reg_data(input [6:0] addr);
         if (addr == 7'h00)
-            get_reg_data = {4'b0, 1'b0, leak_sel, 1'b0};
+            get_reg_data = 8'h00;
         else if (addr == 7'h01)
             get_reg_data = v_th;
         else if (addr == 7'h02)
@@ -48,6 +48,8 @@ module reg_file (
             get_reg_data = spikes_out[7:0];
         else if (addr == 7'h05)
             get_reg_data = spikes_out[15:8];
+        else if (addr == 7'h06)
+            get_reg_data = {6'b0, leak_sel};
         else if (addr >= 7'h10 && addr <= 7'h1F)
             get_reg_data = v_mem_all[(addr - 7'h10)*8 +: 8];
         else
@@ -102,12 +104,12 @@ module reg_file (
                             case (current_addr)
                                 7'h00: begin
                                     step_tick <= rx_byte[0];
-                                    leak_sel  <= rx_byte[2:1];
-                                    soft_rst  <= rx_byte[3];
+                                    soft_rst  <= rx_byte[1];
                                 end
                                 7'h01: v_th         <= rx_byte;
                                 7'h02: weight_scale <= rx_byte;
                                 7'h03: ext_spike_in <= rx_byte;
+                                7'h06: leak_sel     <= rx_byte[1:0];
                                 default: ;
                             endcase
                         end
