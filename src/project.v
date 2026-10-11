@@ -20,11 +20,18 @@ module tt_um_kazenoko_talos (
   wire sclk = ui_in[0];
   wire mosi = ui_in[1];
   wire cs_n = ui_in[2];
+  wire ext_tick_in = ui_in[3]; // hardware step tick pulse input
 
-  // Dedicated outputs
+  // SPI signals
   wire miso;
-  wire busy;
-  wire irq;
+  wire [15:0] spikes_out;
+  wire [127:0] v_mem_all;
+  wire reg_step_tick;
+  wire [1:0] leak_sel;
+  wire signed [7:0] v_th;
+  wire signed [7:0] weight_scale;
+  wire [7:0] ext_spike_in;
+  wire soft_rst;
 
   // Internal interconnect wires
   wire [7:0]   rx_byte;
@@ -33,15 +40,17 @@ module tt_um_kazenoko_talos (
   wire [7:0]   tx_byte;
   wire         tx_load;
 
-  wire [23:0]  acc_out;
-  wire [7:0]   act_out;
-  wire         overflow;
-  wire         start_compute;
-  wire         rst_acc;
-  wire [1:0]   mode;
-  wire         act_en;
-  wire [63:0]  weights;
-  wire [255:0] activations;
+  // edge detector on ui_in[3] to allow stepping via SPI or pin
+  reg ext_tick_d;
+  always @(posedge clk or negedge rst_n) begin
+    if (!rst_n)
+      ext_tick_d <= 1'b0;
+    else
+      ext_tick_d <= ext_tick_in;
+  end
+  wire ext_tick_pulse = ext_tick_in & ~ext_tick_d;
+  wire step_tick = reg_step_tick | ext_tick_pulse;
+  wire eff_rst_n = rst_n & ~soft_rst;
 
   // SPI Slave instance
   spi_slave u_spi (
@@ -60,53 +69,45 @@ module tt_um_kazenoko_talos (
 
   // Register File instance
   reg_file u_regs (
-      .clk           (clk),
-      .rst_n         (rst_n),
-      .rx_byte       (rx_byte),
-      .rx_valid      (rx_valid),
-      .cs_active     (cs_active),
-      .tx_byte       (tx_byte),
-      .tx_load       (tx_load),
-      .acc_out       (acc_out),
-      .act_out       (act_out),
-      .overflow      (overflow),
-      .busy          (busy),
-      .start_compute (start_compute),
-      .rst_acc       (rst_acc),
-      .mode          (mode),
-      .act_en        (act_en),
-      .weights       (weights),
-      .activations   (activations),
-      .irq           (irq)
+      .clk (clk),
+      .rst_n (rst_n),
+      .rx_byte (rx_byte),
+      .rx_valid (rx_valid),
+      .cs_active (cs_active),
+      .tx_byte (tx_byte),
+      .tx_load (tx_load),
+      .spikes_out (spikes_out),
+      .v_mem_all (v_mem_all),
+      .step_tick (reg_step_tick),
+      .leak_sel (leak_sel),
+      .v_th (v_th),
+      .weight_scale (weight_scale),
+      .ext_spike_in (ext_spike_in),
+      .soft_rst (soft_rst)
   );
 
-  // Compute Datapath instance
-  dot_product_engine u_engine (
-      .clk           (clk),
-      .rst_n         (rst_n),
-      .start_compute (start_compute),
-      .rst_acc       (rst_acc),
-      .mode          (mode),
-      .act_en        (act_en),
-      .weights       (weights),
-      .activations   (activations),
-      .acc_out       (acc_out),
-      .act_out       (act_out),
-      .overflow      (overflow),
-      .busy          (busy)
+  // 16 Neuron Spiking Recurrent Reservoir Instance
+  spiking_reservoir u_reservoir (
+      .clk (clk),
+      .rst_n (eff_rst_n),
+      .step_tick (step_tick),
+      .ext_spike_in (ext_spike_in),
+      .v_th (v_th),
+      .leak_sel (leak_sel),
+      .weight_scale (weight_scale),
+      .spikes_out (spikes_out),
+      .v_mem_all (v_mem_all)
   );
 
   // Dedicated output pin mapping
-  assign uo_out[0]   = miso;
-  assign uo_out[1]   = busy;
-  assign uo_out[2]   = irq;
-  assign uo_out[7:3] = acc_out[23:19]; // Top 5 bits of accumulator for oscilloscope/debug
+  assign uo_out[0] = miso;
+  assign uo_out[7:1] = spikes_out[6:0]; // neurons 0..6 spikes on carrier board LEDs
 
-  // Bidirectional pins configured as safe high-Z inputs
-  assign uio_out = 8'b00000000;
-  assign uio_oe  = 8'b00000000;
+  // Bidi pin map
+  assign uio_out = spikes_out[15:8]; // neurons 8..15 spikes
+  assign uio_oe = 8'hFF;             // enabled as outputs
 
   // List all unused inputs to prevent compiler warnings
-  wire _unused = &{ena, ui_in[7:3], uio_in, 1'b0};
+  wire _unused = &{ena, ui_in[7:4], uio_in, 1'b0};
 
 endmodule
