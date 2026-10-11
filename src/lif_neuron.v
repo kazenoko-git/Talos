@@ -50,9 +50,8 @@ module lif_neuron (
                 spike_out <= 1'b0;
                 v_mem     <= v_next_clamped;
             end
-        end else begin
-            spike_out <= 1'b0;         // Spikes pulse for exactly 1 step_tick
-        end
+        end 
+        // when step_tick low, hold spike_out and v_mem until next step_tick
     end
 
 endmodule
