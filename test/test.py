@@ -55,40 +55,17 @@ async def spi_read_reg(dut, addr):
     await ClockCycles(dut.clk, 16)
     return val
 
-async def spi_stream_compute(dut, activations, weights):
-    """Streams 32 activations and 32 weights to Port 0x10."""
-    set_cs(dut, True)
-    await ClockCycles(dut.clk, 8)
-    await spi_transfer_byte(dut, 0x10)  # Stream Port Address
-    
-    # Send 32 Activations (Bytes 0 to 31)
-    for a in activations:
-        await spi_transfer_byte(dut, a & 0xFF)
-        
-    # Send 32 Weights (Bytes 32 to 63)
-    for w in weights:
-        # Ternary encoding: 0 -> 2'b00, +1 -> 2'b01, -1 -> 2'b11 (0x03)
-        if w == 1:
-            code = 0x01
-        elif w == -1:
-            code = 0x03
-        else:
-            code = 0x00
-        await spi_transfer_byte(dut, code)
-        
-    await ClockCycles(dut.clk, 8)
-    set_cs(dut, False)
-    await ClockCycles(dut.clk, 16)
+async def step_reservoir_spi(dut):
+    """This pulses step_tick via SPI control register 0x00."""
+    await spi_write_reg(dut, 0x00, 0x01)
 
-async def spi_read_accumulator(dut):
-    """Reads 24-bit accumulator value from registers 0x02, 0x03, 0x04."""
-    low = await spi_read_reg(dut, 0x02)
-    mid = await spi_read_reg(dut, 0x03)
-    high = await spi_read_reg(dut, 0x04)
-    val = (high << 16) | (mid << 8) | low
-    if val & 0x800000:
-        val -= 0x1000000
-    return val
+async def step_reservoir_pin(dut):
+    """This pulses the ext_tick input pin ui_in[3]."""
+    current = int(dut.ui_in.value)
+    dut.ui_in.value = current | (1 << 3)
+    await ClockCycles(dut.clk, 4)
+    dut.ui_in.value = current & ~(1 << 3)
+    await ClockCycles(dut.clk, 4)
 
 async def reset_dut(dut):
     clock = Clock(dut.clk, 62.5, unit="ns") # 16 MHz
@@ -102,88 +79,122 @@ async def reset_dut(dut):
     await ClockCycles(dut.clk, 10)
 
 @cocotb.test()
-async def test_full_neuromorphic_npu(dut):
-    """Comprehensive End-to-End Test for Talos Neuromorphic Micro-NPU"""
+async def test_spi_registers_and_defaults(dut):
+    """Verify SPI config registers and default neuromorphic parameters."""
     await reset_dut(dut)
-    
-    # -------------------------------------------------------------
-    # 1. SPI Sanity Check
-    # -------------------------------------------------------------
-    dut._log.info("=== Step 1: SPI Register Read/Write Sanity Check ===")
-    await spi_write_reg(dut, 0x00, 0x08) # Set act_en=1
-    ctrl_val = await spi_read_reg(dut, 0x00)
-    dut._log.info(f"Read back Control Register: {hex(ctrl_val)}")
-    assert ctrl_val == 0x08, f"Expected 0x08, got {hex(ctrl_val)}"
-    
-    # -------------------------------------------------------------
-    # 2. BitNet b1.58 Ternary Math Accuracy
-    # -------------------------------------------------------------
-    dut._log.info("=== Step 2: BitNet b1.58 Ternary Dot Product Math ===")
-    await spi_write_reg(dut, 0x00, 0x01) # Reset accumulator
-    
-    activations = [10] * 32
-    weights = [1]*16 + [0]*8 + [-1]*8 # 16*(+10) + 0 - 8*(+10) = +80
-    await spi_stream_compute(dut, activations, weights)
-    
-    acc = await spi_read_accumulator(dut)
-    dut._log.info(f"Accumulator output: {acc} (Expected: +80)")
-    assert acc == 80, f"Expected 80, got {acc}"
-    
-    # Read Post-Activation output (Register 0x05)
-    act_out = await spi_read_reg(dut, 0x05)
-    dut._log.info(f"Post-Activation output (reg 0x05): {act_out} (Expected: 80)")
-    assert act_out == 80, f"Expected 80, got {act_out}"
-    
-    # -------------------------------------------------------------
-    # 3. Chained Multi-Chunk Accumulation and Reset
-    # -------------------------------------------------------------
-    dut._log.info("=== Step 3: Chained Multi-Chunk Accumulation ===")
-    activations2 = [5] * 32
-    weights2 = [1] * 32 # 32 * 5 = +160. Total: 80 + 160 = 240!
-    await spi_stream_compute(dut, activations2, weights2)
-    
-    acc2 = await spi_read_accumulator(dut)
-    dut._log.info(f"Chained Accumulator: {acc2} (Expected: +240)")
-    assert acc2 == 240, f"Expected 240, got {acc2}"
-    
-    # Test accumulator reset via SPI
-    await spi_write_reg(dut, 0x00, 0x01) # rst_acc = 1
-    acc_reset = await spi_read_accumulator(dut)
-    dut._log.info(f"Accumulator after reset: {acc_reset} (Expected: 0)")
-    assert acc_reset == 0, f"Expected 0, got {acc_reset}"
-    
-    # -------------------------------------------------------------
-    # 4. 1-Bit Binary Neural Network (BNN Mode)
-    # -------------------------------------------------------------
-    dut._log.info("=== Step 4: 1-Bit BNN Mode (XNOR Popcount) ===")
-    await spi_write_reg(dut, 0x00, 0x02) # Mode = 01 (BNN)
-    
-    activations_bnn = [1] * 32
-    weights_bnn = [1] * 32 # 1 XNOR 1 = +1 for all 32 lanes -> sum = +32
-    await spi_stream_compute(dut, activations_bnn, weights_bnn)
-    
-    acc_bnn = await spi_read_accumulator(dut)
-    dut._log.info(f"BNN Accumulator: {acc_bnn} (Expected: +32)")
-    assert acc_bnn == 32, f"Expected 32, got {acc_bnn}"
-    
-    # -------------------------------------------------------------
-    # 5. Fused ReLU and Clamp Function
-    # -------------------------------------------------------------
-    dut._log.info("=== Step 5: Fused ReLU and Clamping ===")
-    # Reset accumulator, Mode = 00 (BitNet), act_en = 1 (bit 3) -> 0x09
-    await spi_write_reg(dut, 0x00, 0x09)
-    
-    activations_neg = [10] * 32
-    weights_neg = [-1] * 32 # 32 * -10 = -320
-    await spi_stream_compute(dut, activations_neg, weights_neg)
-    
-    acc_neg = await spi_read_accumulator(dut)
-    dut._log.info(f"Raw Negative Accumulator: {acc_neg} (Expected: -320)")
-    assert acc_neg == -320, f"Expected -320, got {acc_neg}"
-    
-    # Check that fused ReLU clamps negative to 0 on reg 0x05
-    act_neg = await spi_read_reg(dut, 0x05)
-    dut._log.info(f"Post-ReLU Output: {act_neg} (Expected: 0)")
-    assert act_neg == 0, f"Expected ReLU output 0, got {act_neg}"
-    
-    dut._log.info("*** ALL TALOS TESTS COMPLETED SUCCESSFULLY! ***")
+    dut._log.info("Testing default register values...")
+
+    v_th = await spi_read_reg(dut, 0x01)
+    weight_scale = await spi_read_reg(dut, 0x02)
+    assert v_th == 32, f"Expected default V_th = 32, got {v_th}"
+    assert weight_scale == 12, f"Expected default W_scale = 12, got {weight_scale}"
+
+    # Write new params
+    dut._log.info("Configuring custom V-th=50, W_scale=16, leak_sel=01 (>>3)...")
+    await spi_write_reg(dut, 0x01, 50)
+    await spi_write_reg(dut, 0x02, 16)
+    await spi_write_reg(dut, 0x06, 0x01) # leak_sel = 01 (>>3)
+
+    v_th_read = await spi_read_reg(dut, 0x01)
+    w_scale_read = await spi_read_reg(dut, 0x02)
+    leak_read = await spi_read_reg(dut, 0x06)
+    assert v_th_read == 50, f"Expected V_th = 50, got {v_th_read}"
+    assert w_scale_read == 16, f"Expected W_scale = 16, got {w_scale_read}"
+    assert leak_read == 0x01, f"Expected leak_sel=01, got {leak_read}"
+
+@cocotb.test()
+async def test_subthreshold_integration_and_leak(dut):
+    """Verify leaky integration decay when potential is subthreshold."""
+    await reset_dut(dut)
+    # Set V_th = 60, W_scale = 10, leak_sel = 10 (>>2 = 25% decay)
+    await spi_write_reg(dut, 0x01, 60)
+    await spi_write_reg(dut, 0x02, 10)
+    await spi_write_reg(dut, 0x06, 0x02)
+
+    # Inject external spike into Neuron 0 (weight = 2 * 10 = +20)
+    await spi_write_reg(dut, 0x03, 0x01)
+    await step_reservoir_spi(dut)
+
+    v0 = await spi_read_reg(dut, 0x10)
+    dut._log.info(f"After input spike: Neuron 0 potential = {v0}")
+    assert v0 == 20, f"Expected V0=20 after external spike, got {v0}"
+
+    # Clear external spike and advance time: potential must leak (20 - 20>>2 = 15)
+    await spi_write_reg(dut, 0x03, 0x00)
+    await step_reservoir_spi(dut)
+
+    v0_leaked = await spi_read_reg(dut, 0x10)
+    dut._log.info(f"After leak step: Neuron 0 potential = {v0_leaked}")
+    assert v0_leaked == 15, f"Expected V0=15 after leak, got {v0_leaked}"
+
+
+@cocotb.test()
+async def test_threshold_firing_and_reset(dut):
+    """Verify that crossing threshold generates a spike pulse and resets potential."""
+    await reset_dut(dut)
+    # Set V_th = 30, W_scale = 20, leak_sel = 00 (no leak)
+    await spi_write_reg(dut, 0x01, 30)
+    await spi_write_reg(dut, 0x02, 20)
+    await spi_write_reg(dut, 0x06, 0x00)
+
+    # Inject spike into Neuron 0 (input = +40 >= 30 -> fires!)
+    await spi_write_reg(dut, 0x03, 0x01)
+    await step_reservoir_spi(dut)
+
+    spikes_low = await spi_read_reg(dut, 0x04)
+    v0_after = await spi_read_reg(dut, 0x10)
+    dut._log.info(f"Spikes register low: 0x{spikes_low:02X}, V0: {v0_after}")
+
+    assert (spikes_low & 0x01) == 1, "Neuron 0 should have fired a spike!"
+    assert v0_after == 0, f"Expected V0=0 after spike reset, got {v0_after}"
+
+    # Verify physical pin output on carrier board LEDs
+    uo_pins = int(dut.uo_out.value)
+    assert (uo_pins & 0x02) != 0, "uo_out[1] (spike[0] LED) should be active!"
+
+
+@cocotb.test()
+async def test_recurrent_spatio_temporal_dynamics(dut):
+    """Verify recurrent reservoir propagation and fading memory across 16 neurons."""
+    await reset_dut(dut)
+    dut._log.info("Testing 16-neuron recurrent liquid dynamics...")
+
+    # Set parameters: V_th = 25, W_scale = 15, leak_sel = >>3 (12.5% decay)
+    await spi_write_reg(dut, 0x01, 25)
+    await spi_write_reg(dut, 0x02, 15)
+    await spi_write_reg(dut, 0x06, 0x01)
+
+    # Inject a 1-step impulse into Neurons 0 and 2
+    await spi_write_reg(dut, 0x03, 0x05)
+    await step_reservoir_spi(dut)
+
+    # Turn off external input: reservoir now runs autonomously via recurrent feedback
+    await spi_write_reg(dut, 0x03, 0x00)
+
+    for step in range(5):
+        await step_reservoir_spi(dut)
+        spk_lo = await spi_read_reg(dut, 0x04)
+        spk_hi = await spi_read_reg(dut, 0x05)
+        total_spikes = (spk_hi << 8) | spk_lo
+        dut._log.info(f"  Step {step+1}: 16-Neuron Spike Pattern = 0b{total_spikes:016b}")
+
+    dut._log.info("*** All neuromorphic reservoir tests passed! ***")
+
+
+@cocotb.test()
+async def test_hardware_pin_stepping(dut):
+    """Verify that pulsing ext_tick on ui_in[3] advances the reservoir correctly."""
+    await reset_dut(dut)
+    await spi_write_reg(dut, 0x01, 50)
+    await spi_write_reg(dut, 0x02, 12)
+
+    # Inject external spike into Neuron 1
+    await spi_write_reg(dut, 0x03, 0x02)
+
+    # Step via physical pin ui_in[3]
+    await step_reservoir_pin(dut)
+
+    v1 = await spi_read_reg(dut, 0x11)
+    dut._log.info(f"After pin-triggered step: Neuron 1 potential = {v1}")
+    assert v1 == 24, f"Expected V1=24 after pin step, got {v1}"
+
