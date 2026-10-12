@@ -20,19 +20,19 @@ module spi_slave (
     output wire cs_active     // Should be high when cs_n held low
 );
     
-    // 3 stage flip-flop sync to prevent metastability
+    // 2-stage flip-flop sync to prevent metastability
     reg [2:0] sclk_sync;
-    reg [2:0] cs_n_sync;
+    reg [1:0] cs_n_sync;
     reg [1:0] mosi_sync;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             sclk_sync <= 3'b000;
-            cs_n_sync <= 3'b111;
+            cs_n_sync <= 2'b11;
             mosi_sync <= 2'b00;
         end else begin
             sclk_sync <= {sclk_sync[1:0], sclk};
-            cs_n_sync <= {cs_n_sync[1:0], cs_n};
+            cs_n_sync <= {cs_n_sync[0], cs_n};
             mosi_sync <= {mosi_sync[0], mosi};
         end
     end
@@ -44,7 +44,9 @@ module spi_slave (
 
     // bit reception counter and shift register
     reg [2:0] bit_cnt;
+    /* verilator lint_off UNUSEDSIGNAL */
     reg [7:0] rx_shreg;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
