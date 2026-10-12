@@ -37,7 +37,7 @@ module reg_file (
     reg is_read;
     reg [6:0] current_addr;
 
-    assign v_mem_addr = (state == STATE_IDLE) ? rx_byte[3:0] : (current_addr[3:0] + 4'd1)
+    assign v_mem_addr = (state == STATE_IDLE) ? rx_byte[3:0] : (current_addr[3:0] + 4'd1);
 
     // Helper to read register data
     function [7:0] get_reg_data(input [6:0] addr);
