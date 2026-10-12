@@ -9,12 +9,12 @@
 // This computes discrete-time leak, synaptic current integration, clamping, and threshold firing.
 
 module lif_neuron (
-    input  wire signed [7:0] v_mem_in,      // Current membrane potential
-    input  wire signed [7:0] i_syn,         // Total accumulated synaptic current
-    input  wire signed [7:0] v_th,          // Firing threshold
-    input  wire        [1:0] leak_sel,      // Leak shift: 0=none, 1=>>3 (12.5%), 2=>>2 (25%), 3=>>1 (50%)
-    output wire              spike_out,     // 1 if neuron crosses threshold
-    output wire signed [7:0] v_mem_out      // Next potential (reset to 0 on spike, else clamped potential)
+    input wire signed [7:0] v_mem_in,      // Current membrane potential
+    input wire signed [7:0] i_syn,         // Total accumulated synaptic current
+    input wire signed [7:0] v_th,          // Firing threshold
+    input wire [1:0] leak_sel,             // Leak shift: 0=none, 1=>>3 (12.5%), 2=>>2 (25%), 3=>>1 (50%)
+    output wire spike_out,                 // 1 if neuron crosses threshold
+    output wire signed [7:0] v_mem_out     // Next potential (reset to 0 on spike, else clamped potential)
 );
 
     // Arithmetic right shift for leakage decay
