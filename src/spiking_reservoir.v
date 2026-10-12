@@ -28,12 +28,13 @@ module spiking_reservoir (
     // 16 x 8-bit membrane potential register bank
     reg signed [7:0] v_mem [0:15];
 
-    assign v_mem_data = v_mem[v_mem_addr];
-
     reg [15:0] spikes_latched;   // step t-1 spikes held static as recurrent inputs
+    reg [3:0]  neuron_idx;       // Sequencer state
 
-    // Sequencer state
-    reg [3:0] neuron_idx;
+    // Shared read port for LIF ALU and register inspection
+    wire [3:0] v_read_idx = busy ? neuron_idx : v_mem_addr;
+    wire signed [7:0] v_read_data = v_mem[v_read_idx];
+    assign v_mem_data = v_read_data;
 
     // Recurrent neighbor connection indices 
     wire [3:0] pre_exc = neuron_idx - 4'd1; // Neighbor i-1
@@ -43,35 +44,49 @@ module spiking_reservoir (
     // Sign-extended 10-bit weight scale to prevent Verilator WIDTHEXPAND warnings
     wire signed [9:0] w_scale_ext = {{2{weight_scale[7]}}, weight_scale};
     wire signed [9:0] w_scale_2x  = w_scale_ext <<< 1;
+    wire signed [9:0] w_scale_3x  = w_scale_2x + w_scale_ext;
+    wire signed [9:0] w_scale_4x  = w_scale_ext <<< 2;
 
-    // Synaptic current accumulator for active neuron_idx
+    // Synaptic coefficient and current accumulator
+    reg signed [3:0] syn_coeff;
     reg signed [9:0] i_syn_sum;
     reg signed [7:0] i_syn_clamped;
 
     always @(*) begin
-        i_syn_sum = 10'sd0;
+        syn_coeff = 4'sd0;
 
         // External input drive (neurons 0..7 only)
         if (neuron_idx < 4'd8) begin
             if (ext_spike_in[neuron_idx[2:0]])
-                i_syn_sum = i_syn_sum + w_scale_2x;
+                syn_coeff = syn_coeff + 4'sd2;
         end
 
         // Local excitatory recurrence from neighbor (idx - 1)
         if (spikes_latched[pre_exc])
-            i_syn_sum = i_syn_sum + w_scale_ext;
+            syn_coeff = syn_coeff + 4'sd1;
 
         // Local inhibitory recurrence from neighbor (idx + 1)
         if (spikes_latched[pre_inh])
-            i_syn_sum = i_syn_sum - w_scale_ext;
+            syn_coeff = syn_coeff - 4'sd1;
 
         // Long-range cross recurrence from (idx + 5)
         if (spikes_latched[pre_cross]) begin
             if (neuron_idx[0] == 1'b0)
-                i_syn_sum = i_syn_sum + w_scale_ext; // Even neurons: excitatory cross
+                syn_coeff = syn_coeff + 4'sd1; // Even neurons: excitatory cross
             else
-                i_syn_sum = i_syn_sum - w_scale_ext; // Odd neurons: inhibitory cross
+                syn_coeff = syn_coeff - 4'sd1; // Odd neurons: inhibitory cross
         end
+
+        // Scaled current lookup
+        case (syn_coeff)
+            4'sd1:   i_syn_sum = w_scale_ext;
+            -4'sd1:  i_syn_sum = -w_scale_ext;
+            4'sd2:   i_syn_sum = w_scale_2x;
+            -4'sd2:  i_syn_sum = -w_scale_2x;
+            4'sd3:   i_syn_sum = w_scale_3x;
+            4'sd4:   i_syn_sum = w_scale_4x;
+            default: i_syn_sum = 10'sd0;
+        endcase
 
         // Clamp to signed 8 bit limits [-128, +127]
         if (i_syn_sum > 10'sd127)
@@ -83,7 +98,7 @@ module spiking_reservoir (
     end
 
     // Single shared LIF ALU instance 
-    wire signed [7:0] alu_v_mem_in = v_mem[neuron_idx];
+    wire signed [7:0] alu_v_mem_in = v_read_data;
     wire              alu_spike_out;
     wire signed [7:0] alu_v_mem_out;
 
