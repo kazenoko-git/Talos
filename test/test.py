@@ -65,7 +65,7 @@ async def step_reservoir_pin(dut):
     dut.ui_in.value = current | (1 << 3)
     await ClockCycles(dut.clk, 4)
     dut.ui_in.value = current & ~(1 << 3)
-    await ClockCycles(dut.clk, 4)
+    await ClockCycles(dut.clk, 24)
 
 async def reset_dut(dut):
     clock = Clock(dut.clk, 62.5, unit="ns") # 16 MHz
