@@ -6,38 +6,39 @@
 `default_nettype none
 
 module reg_file (
-    input  wire              clk,
-    input  wire              rst_n,
+    input wire clk,
+    input wire rst_n,
 
     // SPI slave interface
-    input  wire [7:0]        rx_byte,
-    input  wire              rx_valid,
-    input  wire              cs_active,
-    output reg  [7:0]        tx_byte,
-    output reg               tx_load,
+    input wire [7:0] rx_byte,
+    input wire  rx_valid,
+    input wire  cs_active,
+    output reg  [7:0] tx_byte,
+    output reg  tx_load,
 
     // Spiking reservoir interface
-    input  wire [15:0]       spikes_out,
-    input  wire [127:0]      v_mem_all,
-    output reg               step_tick,
-    output reg  [1:0]        leak_sel,
-    output reg  signed [7:0] v_th,
-    output reg  signed [7:0] weight_scale,
-    output reg  [7:0]        ext_spike_in,
-    output reg               soft_rst
+    input wire busy,
+    input wire [15:0] spikes_out,
+    input wire [127:0] v_mem_all,
+    output reg step_tick,
+    output reg [1:0] leak_sel,
+    output reg signed [7:0] v_th,
+    output reg signed [7:0] weight_scale,
+    output reg [7:0] ext_spike_in,
+    output reg soft_rst
 );
 
     localparam STATE_IDLE = 1'b0;
     localparam STATE_DATA = 1'b1;
 
-    reg       state;
-    reg       is_read;
+    reg state;
+    reg is_read;
     reg [6:0] current_addr;
 
     // Helper to read register data
     function [7:0] get_reg_data(input [6:0] addr);
         if (addr == 7'h00)
-            get_reg_data = 8'h00;
+            get_reg_data = {5'b0, busy, 2'b00};
         else if (addr == 7'h01)
             get_reg_data = v_th;
         else if (addr == 7'h02)
