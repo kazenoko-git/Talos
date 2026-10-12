@@ -6,14 +6,14 @@
 `default_nettype none
 
 module tt_um_kazenoko_talos (
-    input  wire [7:0] ui_in,    // Dedicated inputs
+    input wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
-    input  wire [7:0] uio_in,   // IOs: Input path
+    input wire [7:0] uio_in,   // IOs: Input path
     output wire [7:0] uio_out,  // IOs: Output path
     output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
-    input  wire       ena,      // Tile enable
-    input  wire       clk,      // Clock (16 MHz)
-    input  wire       rst_n     // Active-low asynchronous reset
+    input wire ena,      // Tile enable
+    input wire clk,      // Clock (16 MHz)
+    input wire rst_n     // Active-low asynchronous reset
 );
 
   // Dedicated SPI inputs
@@ -24,6 +24,7 @@ module tt_um_kazenoko_talos (
 
   // SPI signals
   wire miso;
+  wire busy;
   wire [15:0] spikes_out;
   wire [127:0] v_mem_all;
   wire reg_step_tick;
@@ -34,11 +35,11 @@ module tt_um_kazenoko_talos (
   wire soft_rst;
 
   // Internal interconnect wires
-  wire [7:0]   rx_byte;
-  wire         rx_valid;
-  wire         cs_active;
-  wire [7:0]   tx_byte;
-  wire         tx_load;
+  wire [7:0] rx_byte;
+  wire rx_valid;
+  wire cs_active;
+  wire [7:0] tx_byte;
+  wire tx_load;
 
   // edge detector on ui_in[3] to allow stepping via SPI or pin
   reg ext_tick_d;
@@ -54,16 +55,16 @@ module tt_um_kazenoko_talos (
 
   // SPI Slave instance
   spi_slave u_spi (
-      .clk       (clk),
-      .rst_n     (rst_n),
-      .sclk      (sclk),
-      .mosi      (mosi),
-      .cs_n      (cs_n),
-      .miso      (miso),
-      .rx_byte   (rx_byte),
-      .rx_valid  (rx_valid),
-      .tx_byte   (tx_byte),
-      .tx_load   (tx_load),
+      .clk (clk),
+      .rst_n (rst_n),
+      .sclk (sclk),
+      .mosi (mosi),
+      .cs_n (cs_n),
+      .miso (miso),
+      .rx_byte (rx_byte),
+      .rx_valid (rx_valid),
+      .tx_byte (tx_byte),
+      .tx_load (tx_load),
       .cs_active (cs_active)
   );
 
@@ -76,6 +77,7 @@ module tt_um_kazenoko_talos (
       .cs_active (cs_active),
       .tx_byte (tx_byte),
       .tx_load (tx_load),
+      .busy (busy),
       .spikes_out (spikes_out),
       .v_mem_all (v_mem_all),
       .step_tick (reg_step_tick),
@@ -95,6 +97,7 @@ module tt_um_kazenoko_talos (
       .v_th (v_th),
       .leak_sel (leak_sel),
       .weight_scale (weight_scale),
+      .busy (busy),
       .spikes_out (spikes_out),
       .v_mem_all (v_mem_all)
   );
