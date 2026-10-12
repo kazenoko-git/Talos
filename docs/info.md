@@ -74,7 +74,7 @@ Standard SPI Mode 0 interface running up to 16 MHz. In Mode 0, the clock idles l
 
 | Address | R/W | Name | Description |
 | :--- | :--- | :--- | :--- |
-| `0x00` | W | `CTRL` | Bit 0: Pulse `step_tick` (advances $t \to t+1$); Bit 1: `soft_rst` |
+| `0x00` | R/W | `CTRL` | Bit 0: Pulse `step_tick`, Bit 1: `soft_rst`; Read: Bit 2 = `busy` (1 while computing) |
 | `0x01` | R/W | `V_TH` | 8-bit signed firing threshold (default: `+32`) |
 | `0x02` | R/W | `W_SCALE` | 8-bit signed synaptic weight scale (default: `+12`) |
 | `0x03` | R/W | `EXT_SPIKE`| 8-bit external spike injection vector for Neurons 0–7 |
