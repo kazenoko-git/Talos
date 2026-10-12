@@ -18,21 +18,17 @@ module spiking_reservoir (
     input wire signed [7:0] v_th,            // firing threshold
     input wire [1:0] leak_sel,        // leak shift: 0=none, 1=>>3, 2=>>2, 3=>>1
     input wire signed [7:0] weight_scale,    // synaptic weight magnitude
+    input wire [3:0] v_mem_addr,         // inspection address for the register file
     output reg busy,
     output reg [15:0] spikes_out,      // 16-bit reservoir spike output state
-    output wire [127:0] v_mem_all        // all 16 membrane potentials packed (16 * 8 bits)
+    // output wire [127:0] v_mem_all        // all 16 membrane potentials packed (16 * 8 bits)
+    output wire signed [7:0] v_mem_data     // membrane potential for inspected neuron
 );
 
     // 16 x 8-bit membrane potential register bank
     reg signed [7:0] v_mem [0:15];
 
-    // Pack membrane potentials into 128-bit bus for SPI register inspection
-    genvar p;
-    generate
-        for (p = 0; p < 16; p = p + 1) begin : gen_v_mem_pack
-            assign v_mem_all[p*8 +: 8] = v_mem[p];
-        end
-    endgenerate
+    assign v_mem_data = v_mem[v_mem_addr];
 
     reg [15:0] spikes_latched;   // step t-1 spikes held static as recurrent inputs
     reg [7:0] ext_spike_latched; // external spike snapshot for current step

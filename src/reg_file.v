@@ -19,7 +19,9 @@ module reg_file (
     // Spiking reservoir interface
     input wire busy,
     input wire [15:0] spikes_out,
-    input wire [127:0] v_mem_all,
+    // input wire [127:0] v_mem_all,
+    input wire signed [7:0] v_mem_data,
+    output wire [3:0] v_mem_addr,
     output reg step_tick,
     output reg [1:0] leak_sel,
     output reg signed [7:0] v_th,
@@ -34,6 +36,8 @@ module reg_file (
     reg state;
     reg is_read;
     reg [6:0] current_addr;
+
+    assign v_mem_addr = (state == STATE_IDLE) ? rx_byte[3:0] : (current_addr[3:0] + 4'd1)
 
     // Helper to read register data
     function [7:0] get_reg_data(input [6:0] addr);
@@ -52,7 +56,7 @@ module reg_file (
         else if (addr == 7'h06)
             get_reg_data = {6'b0, leak_sel};
         else if (addr >= 7'h10 && addr <= 7'h1F)
-            get_reg_data = v_mem_all[(addr - 7'h10)*8 +: 8];
+            get_reg_data = v_mem_data;
         else
             get_reg_data = 8'h00;
     endfunction

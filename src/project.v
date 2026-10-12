@@ -26,7 +26,9 @@ module tt_um_kazenoko_talos (
   wire miso;
   wire busy;
   wire [15:0] spikes_out;
-  wire [127:0] v_mem_all;
+  // wire [127:0] v_mem_all;
+  wire [3:0] v_mem_addr;
+  wire signed [7:0] v_mem_data;
   wire reg_step_tick;
   wire [1:0] leak_sel;
   wire signed [7:0] v_th;
@@ -79,7 +81,8 @@ module tt_um_kazenoko_talos (
       .tx_load (tx_load),
       .busy (busy),
       .spikes_out (spikes_out),
-      .v_mem_all (v_mem_all),
+      .v_mem_addr (v_mem_addr),
+      .v_mem_data (v_mem_data),
       .step_tick (reg_step_tick),
       .leak_sel (leak_sel),
       .v_th (v_th),
@@ -99,7 +102,8 @@ module tt_um_kazenoko_talos (
       .weight_scale (weight_scale),
       .busy (busy),
       .spikes_out (spikes_out),
-      .v_mem_all (v_mem_all)
+      .v_mem_addr (v_mem_addr),
+      .v_mem_data (v_mem_data)
   );
 
   // Dedicated output pin mapping
