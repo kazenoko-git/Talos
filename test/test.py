@@ -86,6 +86,9 @@ async def test_spi_registers_and_defaults(dut):
 
     v_th = await spi_read_reg(dut, 0x01)
     weight_scale = await spi_read_reg(dut, 0x02)
+    # NEW BUSY MOD: Verify default CTRL register (idle: busy = 0)
+    ctrl = await spi_read_reg(dut, 0x00)
+    assert ctrl == 0x00, f"Expected default CTRL = 0x00 (idle), got 0x{ctrl:02X}"
     assert v_th == 32, f"Expected default V_th = 32, got {v_th}"
     assert weight_scale == 12, f"Expected default W_scale = 12, got {weight_scale}"
 
