@@ -141,6 +141,6 @@ module spiking_reservoir (
 
     // consume bit 15 to suppress the unused bit warning
 
-    wire _unused = &{spikes_next[15], 1'b0}
+    wire _unused = &{spikes_next[15], 1'b0};
 
 endmodule
