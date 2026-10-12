@@ -36,7 +36,9 @@ module spiking_reservoir (
 
     reg [15:0] spikes_latched;   // step t-1 spikes held static as recurrent inputs
     reg [7:0] ext_spike_latched; // external spike snapshot for current step
+    /* verilator lint_off UNUSEDSIGNAL */
     reg [15:0] spikes_next;      // step t spikes accum across 16 cycles
+    /* verilator lint_on UNUSEDSIGNAL */
 
     // Sequencer state
     reg [3:0] neuron_idx;
@@ -136,5 +138,9 @@ module spiking_reservoir (
             end
         end
     end
+
+    // consume bit 15 to suppress the unused bit warning
+
+    wire _unused = &{spikes_next[15], 1'b0}
 
 endmodule
