@@ -11,15 +11,16 @@
 // Features ternary recurrent synapses {-1, 0, +1} * weight_scale and double-buffered spikes.
 
 module spiking_reservoir (
-    input  wire              clk,
-    input  wire              rst_n,
-    input  wire              step_tick,       // 1 cycle time step trigger pulse
-    input  wire        [7:0] ext_spike_in,    // 8 external spike events from SPI/input
-    input  wire signed [7:0] v_th,            // firing threshold
-    input  wire        [1:0] leak_sel,        // leak shift: 0=none, 1=>>3, 2=>>2, 3=>>1
-    input  wire signed [7:0] weight_scale,    // synaptic weight magnitude
-    output reg        [15:0] spikes_out,      // 16-bit reservoir spike output state
-    output wire      [127:0] v_mem_all        // all 16 membrane potentials packed (16 * 8 bits)
+    input wire clk,
+    input wire rst_n,
+    input wire step_tick,       // 1 cycle time step trigger pulse
+    input wire [7:0] ext_spike_in,    // 8 external spike events from SPI/input
+    input wire signed [7:0] v_th,            // firing threshold
+    input wire [1:0] leak_sel,        // leak shift: 0=none, 1=>>3, 2=>>2, 3=>>1
+    input wire signed [7:0] weight_scale,    // synaptic weight magnitude
+    output reg busy,
+    output reg [15:0] spikes_out,      // 16-bit reservoir spike output state
+    output wire [127:0] v_mem_all        // all 16 membrane potentials packed (16 * 8 bits)
 );
 
     // 16 x 8-bit membrane potential register bank
@@ -33,17 +34,16 @@ module spiking_reservoir (
         end
     endgenerate
 
-    // Double-buffered spike registers
-    reg [15:0] spikes_latched; // Step t-1 spikes are held static as recurrent inputs
-    reg [15:0] spikes_next;    // Step t spikes accumulated across the 16 cycles
+    reg [15:0] spikes_latched;   // step t-1 spikes held static as recurrent inputs
+    reg [7:0] ext_spike_latched; // external spike snapshot for current step
+    reg [15:0] spikes_next;      // step t spikes accum across 16 cycles
 
     // Sequencer state
-    reg       busy;
     reg [3:0] neuron_idx;
 
     // Recurrent neighbor connection indices 
-    wire [3:0] pre_exc   = neuron_idx - 4'd1; // Neighbor i-1
-    wire [3:0] pre_inh   = neuron_idx + 4'd1; // Neighbor i+1
+    wire [3:0] pre_exc = neuron_idx - 4'd1; // Neighbor i-1
+    wire [3:0] pre_inh = neuron_idx + 4'd1; // Neighbor i+1
     wire [3:0] pre_cross = neuron_idx + 4'd5; // Cross neighbor i+5
 
     // Sign-extended 10-bit weight scale to prevent Verilator WIDTHEXPAND warnings
@@ -57,9 +57,9 @@ module spiking_reservoir (
     always @(*) begin
         i_syn_sum = 10'sd0;
 
-        // External input drive (neurons 0..7 only, using [2:0] to prevent SELRANGE warning)
+        // External input drive (neurons 0..7 only, using latched snapshot)
         if (neuron_idx < 4'd8) begin
-            if (ext_spike_in[neuron_idx[2:0]])
+            if (ext_spike_latched[neuron_idx[2:0]])
                 i_syn_sum = i_syn_sum + w_scale_2x;
         end
 
@@ -88,15 +88,15 @@ module spiking_reservoir (
             i_syn_clamped = i_syn_sum[7:0];
     end
 
-    // Single shared LIF ALU instance
+    // Single shared LIF ALU instance 
     wire signed [7:0] alu_v_mem_in = v_mem[neuron_idx];
     wire              alu_spike_out;
     wire signed [7:0] alu_v_mem_out;
 
     lif_neuron u_lif_alu (
-        .v_mem_in  (alu_v_mem_in),
-        .i_syn     (i_syn_clamped),
-        .v_th      (v_th),
+        .v_mem_in (alu_v_mem_in),
+        .i_syn (i_syn_clamped),
+        .v_th (v_th),
         .leak_sel  (leak_sel),
         .spike_out (alu_spike_out),
         .v_mem_out (alu_v_mem_out)
@@ -109,6 +109,7 @@ module spiking_reservoir (
             busy           <= 1'b0;
             neuron_idx     <= 4'd0;
             spikes_latched <= 16'd0;
+            ext_spike_latched <= 8'd0;
             spikes_next    <= 16'd0;
             spikes_out     <= 16'd0;
             for (k = 0; k < 16; k = k + 1) begin
@@ -119,6 +120,7 @@ module spiking_reservoir (
                 busy           <= 1'b1;
                 neuron_idx     <= 4'd0;
                 spikes_latched <= spikes_out; // freeze previous step spikes as inputs
+                ext_spike_latched <= ext_spike_in;
                 spikes_next    <= 16'd0;
             end else if (busy) begin
                 // Update potential and record spike for active neuron
