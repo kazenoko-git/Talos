@@ -31,10 +31,6 @@ module spiking_reservoir (
     assign v_mem_data = v_mem[v_mem_addr];
 
     reg [15:0] spikes_latched;   // step t-1 spikes held static as recurrent inputs
-    reg [7:0] ext_spike_latched; // external spike snapshot for current step
-    /* verilator lint_off UNUSEDSIGNAL */
-    reg [15:0] spikes_next;      // step t spikes accum across 16 cycles
-    /* verilator lint_on UNUSEDSIGNAL */
 
     // Sequencer state
     reg [3:0] neuron_idx;
@@ -55,9 +51,9 @@ module spiking_reservoir (
     always @(*) begin
         i_syn_sum = 10'sd0;
 
-        // External input drive (neurons 0..7 only, using latched snapshot)
+        // External input drive (neurons 0..7 only)
         if (neuron_idx < 4'd8) begin
-            if (ext_spike_latched[neuron_idx[2:0]])
+            if (ext_spike_in[neuron_idx[2:0]])
                 i_syn_sum = i_syn_sum + w_scale_2x;
         end
 
@@ -107,8 +103,6 @@ module spiking_reservoir (
             busy           <= 1'b0;
             neuron_idx     <= 4'd0;
             spikes_latched <= 16'd0;
-            ext_spike_latched <= 8'd0;
-            spikes_next    <= 16'd0;
             spikes_out     <= 16'd0;
             for (k = 0; k < 16; k = k + 1) begin
                 v_mem[k] <= 8'sd0;
@@ -118,25 +112,18 @@ module spiking_reservoir (
                 busy           <= 1'b1;
                 neuron_idx     <= 4'd0;
                 spikes_latched <= spikes_out; // freeze previous step spikes as inputs
-                ext_spike_latched <= ext_spike_in;
-                spikes_next    <= 16'd0;
             end else if (busy) begin
                 // Update potential and record spike for active neuron
                 v_mem[neuron_idx]       <= alu_v_mem_out;
-                spikes_next[neuron_idx] <= alu_spike_out;
+                spikes_out[neuron_idx] <= alu_spike_out;
 
                 if (neuron_idx == 4'd15) begin
                     busy       <= 1'b0;
-                    spikes_out <= {alu_spike_out, spikes_next[14:0]};
                 end else begin
                     neuron_idx <= neuron_idx + 4'd1;
                 end
             end
         end
     end
-
-    // consume bit 15 to suppress the unused bit warning
-
-    wire _unused = &{spikes_next[15], 1'b0};
 
 endmodule
