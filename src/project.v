@@ -6,13 +6,13 @@
 `default_nettype none
 
 module tt_um_kazenoko_talos (
-    input wire [7:0] ui_in,    // Dedicated inputs
-    output wire [7:0] uo_out,   // Dedicated outputs
-    input wire [7:0] uio_in,   // IOs: Input path
-    output wire [7:0] uio_out,  // IOs: Output path
+    input wire [7:0] ui_in,  
+    output wire [7:0] uo_out,   
+    input wire [7:0] uio_in,   
+    output wire [7:0] uio_out,  
     output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
     input wire ena,      // Tile enable
-    input wire clk,      // Clock (16 MHz)
+    input wire clk,      
     input wire rst_n     // Active-low asynchronous reset
 );
 
@@ -111,7 +111,8 @@ module tt_um_kazenoko_talos (
   assign uo_out[7:1] = spikes_out[6:0]; // neurons 0..6 spikes on carrier board LEDs
 
   // Bidi pin map
-  assign uio_out = spikes_out[15:8]; // neurons 8..15 spikes
+  assign uio_out = spikes_out[14:7]; // neurons 7..14 spikes
+  // neuron 15 is accessed through Registers 0x05 and 0x1F, I don't know how the fuck I plan on scaling this up.
   assign uio_oe = 8'hFF;             // enabled as outputs
 
   // List all unused inputs to prevent compiler warnings
