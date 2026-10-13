@@ -483,13 +483,13 @@ async def benchmark_10_dynamical_generation(dut):
 
     history = []
 
-    for step in range(6):
+    for step in range(16):
         await step_reservoir(dut)
         state = await read_potentials(dut)
         history.append(sum(abs(v) for v in state))
             
     dut._log.info(f"  Decay trajectory over 16 steps: {history}")
     dut._log.info(f"  Final steady-state quantization residue: {history[-1]}")
-    # Verify expected decay behavior
+    # Verify expected decay behavior and stable truncation floor
     assert history[0] > history[-1], "Impulse response should decay over time."
-    assert history[-1] > 0, "Truncation deadband (V >>> 3 == 0) prevents decay to absolute zero."
+    assert history[-3:] == [7, 7, 7], f"Expected stable quantization floor [7, 7, 7], got {history[-3:]}"
