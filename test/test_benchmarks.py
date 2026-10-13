@@ -125,7 +125,7 @@ async def benchmark_01_regression_estimation(dut):
         theta = 2.0 * math.pi * (t / 20.0)
         target = math.sin(theta) + 0.5 * math.cos(2.0 * theta)
         
-        spike_byte = (1 << (t % 4))
+        spike_byte = int((target + 1.5) / 3.0 * 15.0)
                 
         await spi_write_reg(dut, 0x03, spike_byte)
         await step_reservoir(dut)
