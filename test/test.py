@@ -155,6 +155,15 @@ async def test_threshold_firing_and_reset(dut):
     uo_pins = int(dut.uo_out.value)
     assert (uo_pins & 0x02) != 0, "uo_out[1] (spike[0] LED) should be active!"
 
+    # Verify Neuron 7 fires and drives uio_out[0] (verifying the pinout fix)
+    await spi_write_reg(dut, 0x03, 0x80) # external spike to Neuron 7
+    await step_reservoir_spi(dut)
+    spikes_low7 = await spi_read_reg(dut, 0x04)
+    assert (spikes_low7 & 0x80) != 0, "Neuron 7 should have fired a spike!"
+    uio_pins = int(dut.uio_out.value)
+    assert (uio_pins & 0x01) != 0, "uio_out[0] (spike[7]) should be active on physical pin!"
+    assert int(dut.uio_oe.value) == 0xFF, "uio_oe should be fully enabled as outputs!"
+
 
 @cocotb.test()
 async def test_recurrent_spatio_temporal_dynamics(dut):
