@@ -7,6 +7,7 @@
 
 // Leaky Integrate-and-Fire (LIF) Neuron Arithmetic Engine (UPDATED with non parallel architecture)
 // This computes discrete-time leak, synaptic current integration, clamping, and threshold firing.
+// Non parallel architecture is probably awful... well it's decent, but it drops true clockspeed to 1MHz. 
 
 module lif_neuron (
     input wire signed [7:0] v_mem_in,      // Current membrane potential

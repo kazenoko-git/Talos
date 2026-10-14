@@ -6,12 +6,12 @@
 `default_nettype none
 
 module spi_slave (
-    input wire clk,    // Clock (16MHz)
-    input wire rst_n,  // Reset (active low)
-    input wire sclk,   // SCK - SPI Serial Clock (ui_in[0])
-    input wire cs_n,   // CS_n - Chip Select (active low) (ui_in[2])
-    input wire mosi,   // The MOSI pin (ui_in[1])
-    output wire miso,  // The MISO pin (ui_out[0])
+    input wire clk,    
+    input wire rst_n, 
+    input wire sclk,   // ui_in[0]
+    input wire cs_n,   // ui_in[2]
+    input wire mosi,   // ui_in[1]
+    output wire miso,  // ui_out[0]
 
     output reg [7:0] rx_byte, // Byte receive 
     output reg rx_valid,      // Pulse when rx_byte ready

@@ -107,23 +107,49 @@ Standard SPI Mode 0 interface running up to 16 MHz. In Mode 0, the clock idles l
 
 ### 1. Automated Simulation (`cocotb`)
 
-The full test suite runs locally with Icarus Verilog and cocotb. cocotb is a Python-based coroutine testbench environment that works with a bunch of simulators, including Icarus [5], [6].
-
+The test suite runs locally with Icarus Verilog and cocotb [5], [6]:
 
 ```bash
 cd test
+source ../.venv/bin/activate
 make clean && make
 ```
 
-The testbench checks:
-
+The standard testbench checks:
 1. SPI register reads, writes, and default configurations.
 2. Leaky integration decay and subthreshold dynamics.
 3. Threshold firing, spike latching, and potential reset.
 4. Recurrent spatio-temporal reservoir reverberation across all 16 neurons.
 5. Physical hardware pin stepping via `ui[3]`.
 
-### 2. Testing on Physical Silicon (with Microcontroller)
+### 2. Neuromorphic ML Benchmark (`test_nn.py`)
+
+To verify the chip as an operational Liquid State Machine on a spatiotemporal pattern recognition task:
+
+```bash
+cd test
+source ../.venv/bin/activate
+make COCOTB_TEST_MODULES=test_nn
+```
+
+This benchmark streams 60 forward vs. reverse temporal spike wave sequences through the hardware model and achieves **100% classification accuracy** on unseen test trials using a linear readout layer on the 16-D reservoir state.
+
+### 3. Waveform Inspection
+
+Waveforms are dumped to `test/tb.fst` during simulation:
+
+```bash
+surfer test/tb.fst
+# or with GTKWave:
+gtkwave test/tb.fst test/tb.gtkw
+```
+
+### 4. Physical GDS Tapeout Workflow
+
+ASIC tapeout synthesis is automated in `.github/workflows/gds.yaml` using `TinyTapeout/tt-gds-action@ttgf26c` targeting GlobalFoundries `gf180mcuD`. Pushing to `main` runs synthesis, precheck DRC, and gate-level netlist simulation automatically.
+
+
+### 5. Testing on Physical Silicon (with Microcontroller)
 
 1. Connect SPI lines (`sclk`, `mosi`, `miso`, `cs_n`) to an RP2040, ESP32, or Arduino.
 2. Initialize parameters over SPI (write `0x01` for threshold, `0x02` for weight, `0x06` for leak).
