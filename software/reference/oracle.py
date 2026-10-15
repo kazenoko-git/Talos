@@ -7,11 +7,14 @@ from typing import List, Optional
 INT32_MIN = -2147483648
 INT32_MAX = 2147483647
 
-def round_tiles_away_from_zero(prod: int, shift: int) -> int:
+def round_ties_away_from_zero(prod: int, shift: int) -> int:
     if shift == 0: return prod
     half = 1 << (shift - 1)      # half the divisor
-    if prod >= 0: return (prod + half) >= shift
+    if prod >= 0: return (prod + half) >> shift
     else: return -((-prod + half) >> shift)
+
+# Backward-compatibility alias for previous typo
+round_tiles_away_from_zero = round_ties_away_from_zero
 
 def quantize_output(acc: int, multiplier: int, shift: int, relu: bool) -> int:
     """
@@ -23,7 +26,7 @@ def quantize_output(acc: int, multiplier: int, shift: int, relu: bool) -> int:
     if multiplier == 0: val = 0
     else: 
         prod = acc * multiplier 
-        val = round_tiles_away_from_zero(prod, shift)
+        val = round_ties_away_from_zero(prod, shift)
     
     if relu: val = max(0, val)
 
@@ -58,9 +61,7 @@ def reference_dense_layer(
     outputs = []
     for m in range(M):
         # Exporter safety bound check
-        assert abs(biases[m]) + 128 * K <= INT32_MAX, (
-            f"Output {m} violates conservative INT32 bound"
-        )
+        assert abs(biases[m]) + 128 * K <= INT32_MAX, (f"Output {m} violates conservative INT32 bound")
         # Apply bias once per output before first input chunk
         acc = biases[m]
         for k in range(K):
@@ -72,13 +73,9 @@ def reference_dense_layer(
             elif w == -1:
                 # Sign extension ensures -(-128) becomes +128 without INT8 overflow
                 acc -= x
-            elif w == 0:
-                pass
-            else:
-                raise ValueError(f"Invalid weight {w} at ({m}, {k})")
+            elif w == 0: pass
+            else: raise ValueError(f"Invalid weight {w} at ({m}, {k})")
         assert INT32_MIN <= acc <= INT32_MAX, f"Accumulator overflow: {acc}"
-        if raw_mode:
-            outputs.append(acc)
-        else:
-            outputs.append(quantize_output(acc, multipliers[m], shifts[m], relu))
+        if raw_mode: outputs.append(acc)
+        else: outputs.append(quantize_output(acc, multipliers[m], shifts[m], relu))
     return outputs
