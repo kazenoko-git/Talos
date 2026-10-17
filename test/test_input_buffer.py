@@ -58,7 +58,7 @@ def test_input_buffer_runner():
     runner = get_runner("icarus")
     runner.build(
         sources=[
-            root_dir / "hdl" / "input_buffer.v",
+            root_dir / "src" / "input_buffer.v",
             test_dir / "tb_input_buffer.v",
         ],
         hdl_toplevel="tb_input_buffer",
