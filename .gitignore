@@ -14,6 +14,7 @@ build/
 dist/
 test/sim_build/
 test/results.xml
+test/*.result.xml
 test/gate_level_netlist.v
 src/user_config.json
 src/config_merged.json
