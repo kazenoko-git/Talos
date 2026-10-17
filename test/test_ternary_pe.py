@@ -1,4 +1,6 @@
 """
+TERNARY PROCESSING ELEMENT COCOTB TESTBENCH
+
 Verifies reset, bias loading, ternary decoding, boundary negation, overflow, and oracle agreement using cocotb
 """
 from pathlib import Path
